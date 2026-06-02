@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ビブリオタイマー</title>
+<style>
+body{font-family:sans-serif;margin:0;text-align:center;background:#1f4e79;color:#fff}
+#wrap{padding:20px;position:relative}
+
+/* 操作ボタン群を右上に絶対配置 */
+#controls {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  display: flex;
+  gap: 8px;
+  z-index: 10;
+  align-items: center;
+}
+
+/* 基本の正方形ボタンスタイル */
+.btn-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  padding: 0;
+}
+.btn-icon:hover {
+  background: rgba(255, 255, 255, 0.35);
+}
+.btn-icon:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* メイン操作ボタン（65px） */
+.btn-main-icon {
+  font-size: 1.8rem;
+  width: 65px;
+  height: 65px;
+  font-weight: bold;
+}
+
+/* 設定・全画面ボタン（45px） */
+.btn-sub-icon {
+  font-size: 1.2rem;
+  width: 45px;
+  height: 45px;
+}
+
+/* 終了画面（白背景）用の黒ボタンのスタイル */
+body.is-finished-mode .btn-icon {
+  background: rgba(0, 0, 0, 0.05);
+  color: #333333;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+}
+body.is-finished-mode .btn-icon:hover {
+  background: rgba(0, 0, 0, 0.15);
+}
+
+/* メイン表示エリアのレイアウト調整 */
+#main-display {
+  margin-top: 40px;
+}
+
+/* 発表者・紹介本エリア（タイマーの上に配置） */
+#speaker-info-area {
+  margin-bottom: 10px;
+}
+
+#speaker, #book-title {
+  font-size: 2.2rem;
+  font-weight: bold;
+  min-height: 3.5rem;
+  line-height: 1.4;
+}
+ruby { ruby-position: over; }
+rt { font-size: 1rem; letter-spacing: 0.1rem; padding-bottom: 2px; color: #ffeb3b; }
+.finished-text rt { color: #4b5563; }
+
+#book-title { margin-top: 5px; }
+
+/* タイマー表示 */
+#time {
+  font-size: 22vw;
+  font-weight: bold;
+  line-height: 1;
+  margin: 10px 0;
+}
+
+/* フェーズ名 */
+#phase {
+  font-size: 2.2rem;
+  font-weight: bold;
+  margin-top: 10px;
+}
+
+/* 終了画面専用の見出し（ドーンと出す文字） */
+#finish-title {
+  font-size: 3.8rem;
+  font-weight: bold;
+  margin-top: 30px;
+  margin-bottom: 20px;
+  color: #000000;
+}
+
+/* 危険・アクションボタン */
+.btn-danger {
+  font-size: 0.85rem;
+  padding: 4px 8px;
+  margin-left: 15px;
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fca5a5;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.btn-danger:hover { background: #fecaca; }
+
+.btn-action {
+  font-size: 0.9rem;
+  padding: 6px 12px;
+  background: #3b82f6;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+  margin-top: 5px;
+}
+.btn-action:hover { background: #2563eb; }
+
+.hidden{display:none !important}
+#settings{background:#fff;color:#000;padding:20px;max-width:750px;margin:20px auto;border-radius:10px;text-align:left}
+label{display:block;margin:8px 0}
+input[type=number]{width:90px}
+
+details {
+  margin: 15px 0;
+  border: 1px solid #e5e7eb;
+  padding: 10px;
+  border-radius: 6px;
+  background: #f9fafb;
+}
+summary {
+  font-size: 1.1rem;
+  font-weight: bold;
+  cursor: pointer;
+  padding: 4px;
+  user-select: none;
+  outline: none;
+}
+summary::-webkit-details-marker { color: #4b5563; }
+
+.speaker-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+.speaker-table th, .speaker-table td { padding: 6px; text-align: left; border-bottom: 1px solid #eee; }
+.speaker-table input[type=text] { width: 90%; padding: 4px; font-size: 0.9rem; }
+
+/* 終了時の一覧表示スタイル */
+#result-area {
+  max-width: 650px;
+  margin: 10px auto;
+  padding: 20px;
+  background: #f3f4f6;
+  border-radius: 8px;
+  color: #000;
+  text-align: left;
+}
+.result-table { width: 100%; border-collapse: collapse; font-size: 1.3rem; }
+.result-table th, .result-table td { padding: 12px; border-bottom: 2px solid #e5e7eb; }
+.result-table th { background: #e5e7eb; font-weight: bold; }
+.result-table td ruby rt { color: #4b5563; }
+
+/* スマートフォンなどの狭い画面用の微調整 */
+@media (max-width: 600px) {
+  #controls {
+    position: static;
+    justify-content: center;
+    margin-bottom: 15px;
+  }
+  #main-display {
+    margin-top: 10px;
+  }
+  #finish-title {
+    font-size: 2.2rem;
+  }
+}
+</style>
+</head>
+<body>
+<div id="wrap">
+
+<div id="controls">
+  <button id="mainBtn" class="btn-icon btn-main-icon" onclick="handleMainBtn()" title="開始/一時停止">▶</button>
+  <button id="skipBtn" class="btn-icon btn-main-icon" onclick="skipPhase()" disabled title="スキップ">⏭</button>
+  <button id="resetBtn" class="btn-icon btn-main-icon" onclick="resetTimer()" title="リセット">↺</button>
+  <button id="settingsBtn" class="btn-icon btn-sub-icon" onclick="toggleSettings()" title="設定">⚙</button>
+  <button class="btn-icon btn-sub-icon" onclick="goFullscreen()" title="全画面化">⛶</button>
+</div>
+
+<div id="main-display">
+  <div id="speaker-info-area">
+    <div id="speaker">発表者 1/5</div>
+    <div id="book-title"></div>
+  </div>
+
+  <div id="time-area">
+    <div id="time">05:00</div>
+  </div>
+  
+  <div id="phase-area">
+    <div id="phase">プレゼンタイム</div>
+  </div>
+</div>
+
+<div id="finish-area" class="hidden">
+  <div id="finish-title">終了（投票の時間です）</div>
+  <div id="result-area" class="hidden"></div>
+</div>
+
+<div id="settings" class="hidden">
+<h2>設定</h2>
+<label>参加人数 <input id="participants" type="number" min="1" value="5" oninput="generateSpeakerInputs()"></label>
+
+<details>
+  <summary>発表者・紹介本の登録を開く</summary>
+  <div>
+    <h3 style="margin-top:15px; display:inline-block;">名簿・紹介本の入力</h3>
+    <button type="button" class="btn-danger" onclick="clearSpeakerData()">登録リセット</button>
+    
+    <table class="speaker-table">
+      <thead>
+        <tr>
+          <th style="width:10%">順番</th>
+          <th style="width:25%">発表者名</th>
+          <th style="width:25%">なまえのふりがな</th>
+          <th style="width:40%">紹介本</th>
+        </tr>
+      </thead>
+      <tbody id="speaker-inputs-body">
+      </tbody>
+    </table>
+
+    <div class="bulk-import-section">
+      <h4 style="margin: 0 0 5px 0; color: #1e293b;">Excel・スプレッドシートから一括登録</h4>
+      <p style="margin: 0 0 8px 0; font-size: 0.8rem; color: #64748b; line-height: 1.3;">
+        Excelの「名前」「ふりがな」「紹介本」のセル（複数行）をコピーし、下の枠にそのまま貼り付けてください。
+      </p>
+      <textarea id="bulk-input" placeholder="ここにExcelからコピーしたセルを貼り付け（Ctrl+V）してください..."></textarea>
+      <br>
+      <button type="button" class="btn-action" onclick="importBulkData()">一括登録を実行</button>
+    </div>
+
+  </div>
+</details>
+
+<label>プレゼンタイム
+<select id="preset" onchange="onSettingChange()">
+<option value="300">5分</option>
+<option value="180">3分</option>
+<option value="-1">自由設定</option>
+</select>
+</label>
+
+<label>プレゼンタイム自由秒数 <input id="presentation" type="number" value="300" oninput="onSettingChange()"></label>
+<label>ディスカッション秒数 <input id="discussion" type="number" value="120"></label>
+<label>移動・準備秒数 <input id="move" type="number" value="15"></label>
+
+<h3>ベル設定</h3>
+<label><input type="checkbox" id="bellStart" checked> プレゼン開始</label>
+<label><input type="checkbox" id="bell1min" checked> プレゼン終了1分前</label>
+<label><input type="checkbox" id="bellEndPres" checked> プレゼン終了</label>
+<label><input type="checkbox" id="bellEndDisc" checked> ディスカッション終了</label>
+
+<button onclick="saveSettings()">保存</button>
+</div>
+</div>
+
+<script>
+let timer=null,currentSpeaker=1;
+let phases=[];
+let phaseIndex=0;
+let remaining=300;
+let running=false;
+let isFinished=false;
+let speakerData=[]; 
+
+function playChime() {
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  const now = ctx.currentTime;
+  
+  const frequencies = [1567.98, 2349.32, 3135.96, 4700.00]; 
+  const gains = [0.4, 0.2, 0.1, 0.05]; 
+  
+  frequencies.forEach((freq, index) => {
+    const osc = ctx.createOscillator();
+    const gainNode = ctx.createGain();
+    
+    osc.type = 'sine';
+    osc.frequency.value = freq;
+    
+    gainNode.gain.setValueAtTime(0, now);
+    gainNode.gain.linearRampToValueAtTime(gains[index], now + 0.005);
+    gainNode.gain.exponentialRampToValueAtTime(0.0001, now + 1.8);
+    
+    osc.connect(gainNode);
+    gainNode.connect(ctx.destination);
+    
+    osc.start(now);
+    osc.stop(now + 1.8);
+  });
+}
+
+function bell(n=1){
+  for(let i=0; i<n; i++){
+    setTimeout(() => {
+      playChime();
+    }, i * 550);
+  }
+}
+
+function generateSpeakerInputs() {
+  const max = parseInt(document.getElementById("participants").value) || 1;
+  const tbody = document.getElementById("speaker-inputs-body");
+  
+  const currentInputs = [];
+  for(let i=1; i<=max; i++) {
+    const nameEl = document.getElementById(`sp-name-${i}`);
+    const rubyEl = document.getElementById(`sp-ruby-${i}`);
+    const bookEl = document.getElementById(`sp-book-${i}`);
+    currentInputs.push({
+      name: nameEl ? nameEl.value : "",
+      ruby: rubyEl ? rubyEl.value : "",
+      book: bookEl ? bookEl.value : ""
+    });
+  }
+
+  tbody.innerHTML = "";
+  for(let i=1; i<=max; i++) {
+    const row = document.createElement("tr");
+    row.innerHTML = `
+      <td>${i}人目</td>
+      <td><input type="text" id="sp-name-${i}" placeholder="例：山田太郎"></td>
+      <td><input type="text" id="sp-ruby-${i}" placeholder="例：やまだたろう"></td>
+      <td><input type="text" id="sp-book-${i}" placeholder="例：走れメロス"></td>
+    `;
+    tbody.appendChild(row);
+    
+    if(currentInputs[i-1]) {
+      document.getElementById(`sp-name-${i}`).value = currentInputs[i-1].name;
+      document.getElementById(`sp-ruby-${i}`).value = currentInputs[i-1].ruby;
+      document.getElementById(`sp-book-${i}`).value = currentInputs[i-1].book;
+    }
+  }
+}
+
+function importBulkData() {
+  const rawText = document.getElementById("bulk-input").value.trim();
+  if (!rawText) {
+    alert("テキストエリアにデータが貼り付けられていません。");
+    return;
+  }
+
+  const lines = rawText.split(/\r?\n/);
+  const parsedData = [];
+
+  lines.forEach(line => {
+    const columns = line.split('\t');
+    if (columns.length > 0) {
+      parsedData.push({
+        name: columns[0] ? columns[0].trim() : "",
+        ruby: columns[1] ? columns[1].trim() : "",
+        book: columns[2] ? columns[2].trim() : ""
+      });
+    }
+  });
+
+  if (parsedData.length === 0) {
+    alert("有効なデータが見つかりませんでした。");
+    return;
+  }
+
+  document.getElementById("participants").value = parsedData.length;
+  generateSpeakerInputs();
+
+  parsedData.forEach((data, index) => {
+    const i = index + 1;
+    if (document.getElementById(`sp-name-${i}`)) document.getElementById(`sp-name-${i}`).value = data.name;
+    if (document.getElementById(`sp-ruby-${i}`)) document.getElementById(`sp-ruby-${i}`).value = data.ruby;
+    if (document.getElementById(`sp-book-${i}`)) document.getElementById(`sp-book-${i}`).value = data.book;
+  });
+
+  document.getElementById("bulk-input").value = "";
+  alert(`${parsedData.length}名分のデータを読み込みました。\n画面下の「保存」ボタンを押すと確定します。`);
+}
+
+function clearSpeakerData() {
+  if(!confirm("登録されている発表者名と紹介本をすべて消去してもよろしいですか？")) {
+    return;
+  }
+  
+  const max = parseInt(document.getElementById("participants").value) || 1;
+  for(let i=1; i<=max; i++) {
+    const nameEl = document.getElementById(`sp-name-${i}`);
+    const rubyEl = document.getElementById(`sp-ruby-${i}`);
+    const bookEl = document.getElementById(`sp-book-${i}`);
+    if(nameEl) nameEl.value = "";
+    if(rubyEl) rubyEl.value = "";
+    if(bookEl) bookEl.value = "";
+  }
+  
+  speakerData = [];
+  
+  const s = JSON.parse(localStorage.getItem("biblioSettings") || "{}");
+  s.speakerData = [];
+  localStorage.setItem("biblioSettings", JSON.stringify(s));
+  
+  if(!running && !isFinished) {
+    updateDisplay();
+  }
+  
+  alert("登録データをクリアしました");
+}
+
+function loadSettings(){
+ const s=JSON.parse(localStorage.getItem("biblioSettings")||"{}");
+ for(const k in s){
+  const e=document.getElementById(k);
+  if(!e) continue;
+  if(e.type==="checkbox") e.checked=s[k];
+  else e.value=s[k];
+ }
+ 
+ generateSpeakerInputs();
+ if(s.speakerData) {
+   speakerData = s.speakerData;
+   speakerData.forEach((d, idx) => {
+     const nameEl = document.getElementById(`sp-name-${idx+1}`);
+     const rubyEl = document.getElementById(`sp-ruby-${idx+1}`);
+     const bookEl = document.getElementById(`sp-book-${idx+1}`);
+     if(nameEl) nameEl.value = d.name || "";
+     if(rubyEl) rubyEl.value = d.ruby || "";
+     if(bookEl) bookEl.value = d.book || "";
+   });
+ }
+}
+
+function saveSettings(){
+ const ids=["participants","preset","presentation","discussion","move","bellStart","bell1min","bellEndPres","bellEndDisc"];
+ let s={};
+ ids.forEach(id=>{
+  const e=document.getElementById(id);
+  s[id]=(e.type==="checkbox")?e.checked:e.value;
+ });
+
+ const max = parseInt(s.participants) || 1;
+ let list = [];
+ for(let i=1; i<=max; i++) {
+   list.push({
+     name: document.getElementById(`sp-name-${i}`).value,
+     ruby: document.getElementById(`sp-ruby-${i}`).value,
+     book: document.getElementById(`sp-book-${i}`).value
+   });
+ }
+ s.speakerData = list;
+ speakerData = list; 
+
+ localStorage.setItem("biblioSettings",JSON.stringify(s));
+ alert("保存しました");
+ 
+ if(!running && !isFinished){
+   updateDisplay();
+ }
+}
+
+function buildPhases(){
+ let pres=(document.getElementById("preset").value==-1)
+   ? parseInt(document.getElementById("presentation").value)
+   : parseInt(document.getElementById("preset").value);
+
+ let disc=parseInt(document.getElementById("discussion").value);
+ let mov=parseInt(document.getElementById("move").value);
+
+ phases=[{name:"プレゼンタイム",sec:pres}];
+ if(disc>0) phases.push({name:"ディスカッション",sec:disc});
+ if(mov>0) phases.push({name:"移動・準備",sec:mov});
+}
+
+function onSettingChange(){
+ if(!running && !isFinished){
+  buildPhases();
+  phaseIndex=0;
+  remaining=phases[0].sec;
+  updateDisplay();
+ }
+}
+
+function handleMainBtn() {
+  if (!running && timer === null) {
+    startTimer();
+  } else {
+    togglePauseTimer();
+  }
+}
+
+function startTimer(){
+ isFinished=false;
+ buildPhases();
+
+ const max = parseInt(document.getElementById("participants").value) || 1;
+ speakerData = [];
+ for(let i=1; i<=max; i++) {
+   const n = document.getElementById(`sp-name-${i}`);
+   const r = document.getElementById(`sp-ruby-${i}`);
+   const b = document.getElementById(`sp-book-${i}`);
+   speakerData.push({ name: n?n.value:"", ruby: r?r.value:"", book: b?b.value:"" });
+ }
+
+ phaseIndex=0;
+ remaining=phases[0].sec;
+ document.getElementById("finish-area").classList.add("hidden");
+ document.getElementById("main-display").classList.remove("hidden");
+ updateDisplay();
+ if(document.getElementById("bellStart").checked) bell(1);
+
+ document.getElementById("settings").classList.add("hidden");
+ running=true;
+ document.getElementById("settingsBtn").disabled=true;
+ document.getElementById("mainBtn").textContent="⏸";
+ document.getElementById("skipBtn").disabled=false;
+
+ timer=setInterval(()=>{
+   remaining--;
+
+   if(phases[phaseIndex].name==="プレゼンタイム" &&
+      remaining===60 &&
+      document.getElementById("bell1min").checked){
+      bell(1);
+   }
+
+   if(remaining<0){
+      nextPhase();
+      return;
+   }
+
+   updateDisplay();
+ },1000);
+}
+
+function togglePauseTimer(){
+ if(!running && timer !== null){
+   running=true;
+   document.getElementById("mainBtn").textContent="⏸";
+   timer=setInterval(()=>{
+     remaining--;
+     if(phases[phaseIndex].name==="プレゼンタイム" && remaining===60 && document.getElementById("bell1min").checked){
+        bell(1);
+     }
+     if(remaining<0){
+        nextPhase();
+        return;
+     }
+     updateDisplay();
+   },1000);
+ } else if(running){
+   running=false;
+   clearInterval(timer);
+   timer=true;
+   document.getElementById("mainBtn").textContent="▶";
+ }
+}
+
+function skipPhase(){
+ if(timer === null) return;
+ nextPhase();
+}
+
+function nextPhase(){
+ let current=phases[phaseIndex].name;
+ let max=parseInt(document.getElementById("participants").value);
+
+ if(current==="プレゼンタイム" && document.getElementById("bellEndPres").checked) bell(2);
+ if(current==="ディスカッション" && document.getElementById("bellEndDisc").checked) bell(2);
+
+ let isLastSpeaker = (currentSpeaker >= max);
+ let hasNextPhase = (phaseIndex + 1 < phases.length);
+ 
+ if (isLastSpeaker && (!hasNextPhase || phases[phaseIndex + 1].name === "移動・準備")) {
+   finish();
+   return;
+ }
+
+ phaseIndex++;
+
+ if(phaseIndex>=phases.length){
+   currentSpeaker++;
+   if(currentSpeaker>max){
+      finish();
+      return;
+   }
+   phaseIndex=0;
+   if(document.getElementById("bellStart").checked) bell(1);
+ }
+
+ remaining=phases[phaseIndex].sec;
+ updateDisplay();
+}
+
+function pauseTimer(){
+ running=false;
+ clearInterval(timer);
+ timer=null;
+ document.getElementById("settingsBtn").disabled=false;
+ document.getElementById("mainBtn").textContent="▶";
+ document.getElementById("skipBtn").disabled=true;
+}
+
+function resetTimer(){
+ pauseTimer();
+ isFinished=false;
+ currentSpeaker=1;
+ buildPhases();
+ phaseIndex=0;
+ remaining=phases[0].sec;
+ document.getElementById("finish-area").classList.add("hidden");
+ document.getElementById("main-display").classList.remove("hidden");
+ updateDisplay();
+}
+
+function finish(){
+ pauseTimer();
+ isFinished=true;
+ showResults();
+ updateDisplay();
+}
+
+function showResults() {
+  const max = parseInt(document.getElementById("participants").value) || 1;
+  const resultArea = document.getElementById("result-area");
+  
+  // 1人でも名前か本が入力されているかチェック
+  let hasAnyData = false;
+  for (let i = 0; i < max; i++) {
+    const info = speakerData[i];
+    if (info && (info.name.trim() !== "" || info.book.trim() !== "")) {
+      hasAnyData = true;
+      break;
+    }
+  }
+
+  // 誰も登録していなければ、一覧エリア（グレーの枠）ごと非表示にして終了
+  if (!hasAnyData) {
+    resultArea.classList.add("hidden");
+    return;
+  }
+  
+  let html = `<table class="result-table">`;
+  html += `<thead><tr><th style="width:15%">順番</th><th style="width:35%">発表者</th><th style="width:50%">紹介本</th></tr></thead>`;
+  html += `<tbody>`;
+  
+  for (let i = 0; i < max; i++) {
+    const info = speakerData[i];
+    let nameStr = `発表者 ${i + 1}`;
+    let bookStr = `（未登録）`;
+    
+    if (info) {
+      if (info.name.trim() !== "") {
+        if (info.ruby.trim() !== "") {
+          nameStr = `<ruby>${info.name}<rt>${info.ruby}</rt></ruby> さん`;
+        } else {
+          nameStr = `${info.name} さん`;
+        }
+      }
+      if (info.book.trim() !== "") {
+        bookStr = `『${info.book}』`;
+      }
+    }
+    
+    html += `<tr><td>${i + 1}人目</td><td>${nameStr}</td><td><strong>${bookStr}</strong></td></tr>`;
+  }
+  
+  html += `</tbody></table>`;
+  resultArea.innerHTML = html;
+  resultArea.classList.remove("hidden"); // データがある時だけ表示
+}
+
+function updateDisplay(){
+ const max = document.getElementById("participants").value;
+ const currentPhaseName = phases[phaseIndex]?.name || "";
+ 
+ let targetSpeakerIdx = currentSpeaker - 1;
+ let isNextNotice = false;
+ 
+ if (currentPhaseName === "移動・準備") {
+   targetSpeakerIdx = currentSpeaker; 
+   isNextNotice = true;
+ }
+ 
+ const info = speakerData[targetSpeakerIdx];
+ const speakerEl = document.getElementById("speaker");
+ const bookEl = document.getElementById("book-title");
+ const timeEl = document.getElementById("time");
+ const phaseEl = document.getElementById("phase");
+ 
+ if (isFinished) {
+   // 終了時は進行用の画面を隠し、終了専用エリアを表示
+   document.getElementById("main-display").classList.add("hidden");
+   document.getElementById("finish-area").classList.remove("hidden");
+ } else {
+   // 進行中は進行用画面を表示し、終了エリアを隠す
+   document.getElementById("main-display").classList.remove("hidden");
+   document.getElementById("finish-area").classList.add("hidden");
+   
+   let labelPrefix = isNextNotice ? "次の発表者：" : "発表者：";
+   let displayNum = isNextNotice ? (targetSpeakerIdx + 1) : currentSpeaker;
+   
+   if (info && info.name.trim() !== "") {
+     let nameHtml = "";
+     if (info.ruby.trim() !== "") {
+       nameHtml = `<ruby>${info.name}<rt>${info.ruby}</rt></ruby>`;
+     } else {
+       nameHtml = info.name;
+     }
+     speakerEl.innerHTML = `${labelPrefix}${nameHtml} さん (${displayNum}/${max})`;
+   } else {
+     speakerEl.textContent = `${labelPrefix} ${displayNum}/${max}`;
+   }
+
+   if (info && info.book.trim() !== "") {
+     bookEl.textContent = `紹介本：『${info.book}』`;
+   } else {
+     bookEl.textContent = "";
+   }
+
+   phaseEl.textContent = currentPhaseName;
+
+   let m=Math.floor(remaining/60);
+   let s=remaining%60;
+   timeEl.textContent=String(m).padStart(2,"0")+":"+String(s).padStart(2,"0");
+ }
+
+ if(currentPhaseName === "プレゼンタイム" && remaining<=60){
+   timeEl.style.color="#ff4444";
+ }else{
+   timeEl.style.color=isFinished?"#000000":"#ffffff";
+ }
+
+ updateBackground();
+}
+
+function toggleSettings(){
+ document.getElementById("settings").classList.toggle("hidden");
+}
+
+function updateBackground(){
+ if(isFinished){
+  document.body.style.background="#ffffff";
+  document.body.style.color="#000000";
+  document.body.classList.add("is-finished-mode");
+  return;
+ }
+ 
+ document.body.classList.remove("is-finished-mode");
+ document.body.style.color="#ffffff";
+ const p = phases[phaseIndex]?.name || "";
+ if(p==="プレゼンタイム") document.body.style.background="#1f4e79";
+ else if(p==="ディスカッション") document.body.style.background="#d97706";
+ else if(p==="move" || p==="移動・準備") document.body.style.background="#15803d";
+}
+
+function goFullscreen(){
+ if(document.documentElement.requestFullscreen){
+  document.documentElement.requestFullscreen();
+ }
+}
+
+loadSettings();
+buildPhases();
+updateDisplay();
+</script>
+</body>
+</html>
